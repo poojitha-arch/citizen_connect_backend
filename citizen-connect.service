@@ -1,0 +1,15 @@
+[Unit]
+Description=Citizen Connect Backend Service
+After=syslog.target network.target
+
+[Service]
+User=ec2-user
+WorkingDirectory=/home/ec2-user/citizen_connect_backend
+ExecStart=/usr/bin/java -jar /home/ec2-user/citizen_connect_backend/target/citizen-connect-backend-0.0.1-SNAPSHOT.jar
+EnvironmentFile=/home/ec2-user/citizen_connect_backend/.env.systemd
+SuccessExitStatus=143
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
