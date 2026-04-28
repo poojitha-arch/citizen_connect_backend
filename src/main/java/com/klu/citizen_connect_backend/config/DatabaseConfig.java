@@ -1,7 +1,8 @@
 package com.klu.citizen_connect_backend.config;
 
+import com.zaxxer.hikari.HikariConfig;
+import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.boot.jdbc.DataSourceBuilder;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
@@ -15,10 +16,10 @@ public class DatabaseConfig {
     @Value("${db.url.raw}")
     private String databaseUrl;
 
-    @Value("${spring.datasource.username}")
+    @Value("${spring.datasource.username:}")
     private String username;
 
-    @Value("${spring.datasource.password}")
+    @Value("${spring.datasource.password:}")
     private String password;
 
     @Value("${spring.datasource.driver-class-name:org.postgresql.Driver}")
@@ -32,7 +33,6 @@ public class DatabaseConfig {
         String finalPassword = password;
 
         try {
-            // Remove 'jdbc:' prefix temporarily for URI parsing if present
             String cleanUrl = url;
             if (url != null && url.startsWith("jdbc:")) {
                 cleanUrl = url.substring(5);
@@ -40,24 +40,26 @@ public class DatabaseConfig {
 
             if (cleanUrl != null && (cleanUrl.startsWith("postgresql://") || cleanUrl.startsWith("postgres://"))) {
                 URI uri = new URI(cleanUrl);
-                
+
                 if (uri.getUserInfo() != null) {
-                    String[] userInfo = uri.getUserInfo().split(":");
+                    String[] userInfo = uri.getUserInfo().split(":", 2);
                     finalUsername = userInfo[0];
+
                     if (userInfo.length > 1) {
                         finalPassword = userInfo[1];
                     }
-                    
-                    // Reconstruct the URL without credentials for JDBC
+
                     String host = uri.getHost();
                     int port = uri.getPort();
                     String path = uri.getPath();
+
                     url = "jdbc:postgresql://" + host + (port != -1 ? ":" + port : "") + path;
+
                     if (uri.getQuery() != null) {
                         url += "?" + uri.getQuery();
                     }
+
                 } else if (!url.startsWith("jdbc:")) {
-                    // Ensure it has the jdbc: prefix if it was missing
                     if (url.startsWith("postgresql://")) {
                         url = "jdbc:" + url;
                     } else if (url.startsWith("postgres://")) {
@@ -66,7 +68,6 @@ public class DatabaseConfig {
                 }
             }
         } catch (Exception e) {
-            // If parsing fails, fall back to simple logic
             if (url != null && !url.startsWith("jdbc:")) {
                 if (url.startsWith("postgresql://")) {
                     url = "jdbc:" + url;
@@ -76,11 +77,19 @@ public class DatabaseConfig {
             }
         }
 
-        return DataSourceBuilder.create()
-                .url(url)
-                .username(finalUsername)
-                .password(finalPassword)
-                .driverClassName(driverClassName)
-                .build();
+        HikariConfig config = new HikariConfig();
+        config.setJdbcUrl(url);
+        config.setUsername(finalUsername);
+        config.setPassword(finalPassword);
+        config.setDriverClassName(driverClassName);
+
+        config.setMaximumPoolSize(3);
+        config.setMinimumIdle(1);
+        config.setConnectionTimeout(30000);
+        config.setIdleTimeout(600000);
+        config.setMaxLifetime(1800000);
+        config.setPoolName("CitizenConnectHikariPool");
+
+        return new HikariDataSource(config);
     }
 }
